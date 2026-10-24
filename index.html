@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f766e">
+<title>পথের সাথী</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<!--
+  ============ পথের সাথী — ওপেন সোর্স রাইড-কানেক্ট অ্যাপ ============
+  চালু করার ধাপ (বিস্তারিত চ্যাটে দেওয়া আছে):
+  1. Firebase-এ প্রজেক্ট খুলে Realtime Database চালু করুন
+  2. নিচের স্ক্রিপ্টের শুরুতে FIREBASE_CONFIG-এ আপনার কনফিগ বসান
+  3. GitHub Pages-এ এই ফাইলটা index.html নামে আপলোড করুন
+  FIREBASE_CONFIG খালি (null) থাকলে অ্যাপ "ডেমো মোডে" চলবে (শুধু আপনার ফোন/ব্রাউজারে)।
+-->
+<style>
+:root{--g:#0f766e;--gd:#115e59;--gl:#ccfbf1;--o:#ea580c;--ol:#ffedd5;--bg:#f1f5f9;--tx:#0f172a;--mu:#64748b;--bd:#e2e8f0}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%}
+body{font-family:"Noto Sans Bengali","Hind Siliguri",system-ui,sans-serif;background:var(--bg);color:var(--tx);font-size:15px}
+header{background:var(--g);color:#fff;display:flex;align-items:center;gap:8px;padding:10px 14px;padding-top:max(10px,env(safe-area-inset-top));position:sticky;top:0;z-index:1200}
+header h1{font-size:18px;margin:0;flex:1;font-weight:800}
+.badge{background:rgba(255,255,255,.2);border-radius:99px;padding:3px 10px;font-size:13px}
+header button{background:rgba(255,255,255,.2);border:0;color:#fff;border-radius:10px;padding:6px 10px;font-size:15px;font-family:inherit}
+#main{max-width:720px;margin:0 auto;padding:10px 10px 30px}
+.box{background:#fff;border:1px solid var(--bd);border-radius:14px;padding:12px;margin-bottom:10px}
+.demo{background:#fef9c3;border:1px solid #fde047;border-radius:12px;padding:8px 12px;margin-bottom:10px;font-size:13px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.where{font-weight:600}
+.mu{color:var(--mu);font-size:13px}
+.seg{display:flex;gap:6px}
+.seg button{flex:1;border:2px solid var(--bd);background:#fff;border-radius:12px;padding:10px 4px;font-size:15px;font-weight:600;font-family:inherit}
+.seg button.on.w{background:#dcfce7;border-color:#16a34a}
+.seg button.on.r{background:var(--ol);border-color:var(--o)}
+.seg button.on.x{background:#e2e8f0;border-color:#64748b}
+input,select{width:100%;padding:11px;border:1.5px solid var(--bd);border-radius:10px;font-size:15px;font-family:inherit;background:#fff;margin-top:6px}
+label.f{display:block;font-weight:600;margin-top:10px;font-size:14px}
+.btn{border:0;background:var(--g);color:#fff;border-radius:12px;padding:12px 16px;font-size:16px;font-weight:700;font-family:inherit;width:100%;margin-top:10px}
+.btn.o{background:var(--o)}
+.btn.gr{background:#64748b}
+.mapw{position:relative;margin-bottom:10px}
+#map{height:46vh;min-height:300px;border-radius:14px;border:1px solid var(--bd);z-index:1}
+#loc{position:absolute;right:10px;bottom:10px;z-index:1000;background:#fff;border:0;border-radius:50%;width:44px;height:44px;font-size:20px;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.mkw{overflow:visible}
+.mk{position:absolute;left:0;top:0;transform:translate(-19px,-19px);display:flex;align-items:center;gap:4px;white-space:nowrap}
+.mi{width:38px;height:38px;border-radius:50%;background:#fff;border:3px solid #64748b;display:grid;place-items:center;font-size:21px;box-shadow:0 2px 6px rgba(0,0,0,.3);flex:none}
+.mk.wait .mi{border-color:#16a34a}.mk.run .mi{border-color:var(--o)}.mk.pass .mi{border-color:#2563eb}
+.ml{background:rgba(255,255,255,.96);border-radius:8px;padding:2px 7px;line-height:1.3;box-shadow:0 1px 5px rgba(0,0,0,.3);display:flex;flex-direction:column;max-width:170px}
+.ml b{font-size:13px;font-weight:800;overflow:hidden;text-overflow:ellipsis}
+.ml span{font-size:12px;font-weight:600;color:#1d4ed8;overflow:hidden;text-overflow:ellipsis}
+.ml i{font-size:11px;font-style:normal;font-weight:600}
+.mk.wait .ml i{color:#15803d}.mk.run .ml i{color:var(--o)}
+.nolabel .ml{display:none}
+.card{display:flex;gap:10px;align-items:center;background:#fff;border:1px solid var(--bd);border-radius:14px;padding:10px;margin-bottom:8px}
+.card .ic{width:50px;height:50px;border-radius:50%;display:grid;place-items:center;font-size:28px;background:#f1f5f9;flex:none;border:3px solid #64748b}
+.card.wait .ic{border-color:#16a34a}.card.run .ic{border-color:var(--o)}.card.pass .ic{border-color:#2563eb}
+.card .inf{flex:1;min-width:0}
+.card .pl{font-size:17px;font-weight:800;line-height:1.3}
+.card .ds{font-size:16px;font-weight:700;color:#1d4ed8;line-height:1.3}
+.card .mt{font-size:12.5px;color:var(--mu);margin-top:2px}
+.card button{border:0;background:var(--g);color:#fff;border-radius:12px;padding:12px 14px;font-weight:700;font-size:15px;font-family:inherit;flex:none}
+.card button:disabled{background:#cbd5e1;color:#475569}
+.card button.done{background:#16a34a}
+.pop .card{border:0;margin:0;padding:0;min-width:240px}
+.leaflet-popup-content{margin:10px}
+.in{border:2px solid #f59e0b;background:#fffbeb;border-radius:14px;padding:10px;margin-bottom:8px}
+.in.ac{border-color:#16a34a;background:#f0fdf4}
+.in h3{margin:0 0 4px;font-size:16px}
+.in .row{margin-top:8px}
+.in a.call{background:#16a34a;color:#fff;text-decoration:none;border-radius:10px;padding:10px 14px;font-weight:700;font-size:16px}
+.in button{border:1.5px solid var(--bd);background:#fff;border-radius:10px;padding:9px 12px;font-family:inherit;font-weight:600;font-size:14px}
+.empty{text-align:center;color:var(--mu);padding:24px 10px}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#0f172a;color:#fff;padding:10px 16px;border-radius:99px;z-index:3000;font-size:14px;opacity:0;transition:.25s;pointer-events:none;max-width:90%}
+#toast.s{opacity:1}
+#setup{position:fixed;inset:0;background:var(--bg);z-index:2500;overflow:auto;padding:14px}
+#setup .in2{max-width:480px;margin:0 auto}
+.roles{display:flex;gap:8px;margin-top:8px}
+.roles label{flex:1;border:2px solid var(--bd);border-radius:14px;padding:14px 6px;text-align:center;background:#fff;font-weight:700;cursor:pointer}
+.roles input{display:none}
+.roles label:has(input:checked){border-color:var(--g);background:var(--gl)}
+.roles .e{font-size:34px;display:block}
+.hide{display:none!important}
+</style>
+</head>
+<body>
+<header>
+  <h1>🧭 পথের সাথী</h1>
+  <span class="badge" id="roleBadge"></span>
+  <button id="profBtn" title="প্রোফাইল">⚙️</button>
+</header>
+
+<div id="main" class="hide">
+  <div id="demoBar" class="demo hide">🧪 <b>ডেমো মোড:</b> এখন ডেটা শুধু এই ব্রাউজারে থাকছে। সবার সাথে কাজ করাতে Firebase কনফিগ বসান। কয়েকটা নকল গাড়ি/যাত্রী দেখানো হচ্ছে।</div>
+
+  <div id="inbox"></div>
+
+  <div class="box" id="panel"></div>
+
+  <div class="mapw">
+    <div id="map"></div>
+    <button id="loc" title="আমার অবস্থান">📍</button>
+  </div>
+
+  <div class="box">
+    <div class="row">
+      <span class="mu">দূরত্ব:</span>
+      <select id="radius" style="width:auto;margin:0">
+        <option value="2">২ কিমি</option><option value="5" selected>৫ কিমি</option><option value="10">১০ কিমি</option>
+      </select>
+      <label class="mu" style="margin-left:auto;display:flex;gap:6px;align-items:center"><input type="checkbox" id="lbl" checked style="width:auto;margin:0"> ম্যাপে লেখা দেখান</label>
+    </div>
+  </div>
+
+  <div id="listTitle" style="font-weight:800;font-size:16px;margin:4px 2px 8px"></div>
+  <div id="list"></div>
+</div>
+
+<div id="setup" class="hide">
+  <div class="in2">
+    <h2 style="margin:6px 0">🧭 পথের সাথী</h2>
+    <div class="mu">যাত্রী ও গাড়ির চালককে সরাসরি যুক্ত করার ফ্রি অ্যাপ। পুরো বাংলাদেশের জন্য।</div>
+    <div class="box" style="margin-top:12px">
+      <b>আপনি কে?</b>
+      <div class="roles">
+        <label><input type="radio" name="role" value="passenger"><span class="e">🧍</span>আমি যাত্রী</label>
+        <label><input type="radio" name="role" value="driver"><span class="e">🛺</span>আমি চালক</label>
+      </div>
+      <label class="f">আপনার নাম</label>
+      <input id="sName" placeholder="যেমন: রহিম মিয়া" maxlength="30">
+      <label class="f">মোবাইল নম্বর <span class="mu">(নক করলে শুধু তাকেই দেখাবে)</span></label>
+      <input id="sPhone" inputmode="tel" placeholder="01XXXXXXXXX" maxlength="14">
+      <div id="vWrap" class="hide">
+        <label class="f">আপনার গাড়ি</label>
+        <select id="sVeh"></select>
+      </div>
+      <button class="btn" id="sSave">শুরু করুন</button>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* ===================== কনফিগ ===================== */
+// Firebase Console → Project settings → Your apps → Web app থেকে কনফিগ কপি করে এখানে বসান।
+// null থাকলে ডেমো মোডে চলবে।
+const FIREBASE_CONFIG = null;
+/* যেমন:
+const FIREBASE_CONFIG = {
+  apiKey: "...", authDomain: "xxx.firebaseapp.com",
+  databaseURL: "https://xxx-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "xxx", appId: "..."
+};
+*/
+
+/* ===================== সাধারণ ===================== */
+const VEHICLES = {
+  cng:['🛺','সিএনজি'], easybike:['🛺','ইজিবাইক'], rickshaw:['🚲','রিকশা'], car:['🚗','প্রাইভেট কার'],
+  micro:['🚐','মাইক্রো/হাইয়েস'], bus:['🚌','লেগুনা/বাস'], bike:['🏍️','মোটরসাইকেল'],
+  pickup:['🛻','পিকআপ/ট্রাক'], ambulance:['🚑','অ্যাম্বুলেন্স']
+};
+const VEH = k => VEHICLES[k] || ['🚗','গাড়ি'];
+const $ = id => document.getElementById(id);
+const bn = s => String(s).replace(/\d/g, d => '০১২৩৪৫৬৭৮৯'[d]);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function h(tag, cls, text){ const e = document.createElement(tag); if(cls) e.className = cls; if(text != null) e.textContent = text; return e; }
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('s'); clearTimeout(toast.t); toast.t=setTimeout(()=>t.classList.remove('s'),2600); }
+function dist(a,b,c,d){ const R=6371,r=Math.PI/180,dl=(c-a)*r,dn=(d-b)*r; const x=Math.sin(dl/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin(dn/2)**2; return 2*R*Math.asin(Math.sqrt(x)); }
+function fmtKm(k){ return k<1 ? bn(Math.round(k*1000))+' মি' : bn(k.toFixed(1))+' কিমি'; }
+function ago(t){ const s=(Date.now()-t)/1000; if(s<60) return 'এইমাত্র'; return bn(Math.floor(s/60))+' মিনিট আগে'; }
+const cellOf = (lat,lon) => Math.floor(lat*10)+'_'+Math.floor(lon*10);   // ~১১ কিমি বর্গের ঘর
+const TTL = 4*60e3;        // ৪ মিনিট সাড়া না দিলে তালিকা থেকে বাদ
+const KNOCK_TTL = 30*60e3;
+
+/* ===================== প্রোফাইল ===================== */
+let S = {};
+try { S = JSON.parse(localStorage.getItem('psathi') || '{}'); } catch(e){}
+if(!S.id) S.id = 'u' + Math.random().toString(36).slice(2,10) + Date.now().toString(36);
+const saveS = () => localStorage.setItem('psathi', JSON.stringify(S));
+
+/* ===================== ডেটাবেস (Firebase / ডেমো) ===================== */
+function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }
+
+function makeFirebaseDB(cfg){
+  firebase.initializeApp(cfg);
+  const d = firebase.database();
+  return {
+    demo:false,
+    set(p,v,eph){ const r=d.ref(p); if(eph) r.onDisconnect().remove(); return r.set(v); },
+    remove(p){ return d.ref(p).remove(); },
+    listen(p,cb){ const r=d.ref(p); const f=r.on('value',s=>cb(s.val())); return ()=>r.off('value',f); }
+  };
+}
+
+function makeDemoDB(){
+  const KEY='psathi_demo', ls=new Map();
+  const read=()=>{ try{ return JSON.parse(localStorage.getItem(KEY))||{}; }catch(e){ return {}; } };
+  const write=o=>localStorage.setItem(KEY,JSON.stringify(o));
+  const get=(o,p)=>{ const v=p.split('/').reduce((a,k)=>a==null?null:a[k],o); return v===undefined?null:v; };
+  const put=(o,p,v)=>{ const ks=p.split('/'); let a=o; for(let i=0;i<ks.length-1;i++){ a=a[ks[i]]=a[ks[i]]||{}; } if(v===null) delete a[ks[ks.length-1]]; else a[ks[ks.length-1]]=v; };
+  const fire=()=>{ const o=read(); ls.forEach((cbs,p)=>{ const v=get(o,p); cbs.forEach(cb=>cb(v)); }); };
+  window.addEventListener('storage',e=>{ if(e.key===KEY) fire(); });
+  return {
+    demo:true,
+    set(p,v){ const o=read(); put(o,p,JSON.parse(JSON.stringify(v))); write(o); setTimeout(fire,0); return Promise.resolve(); },
+    remove(p){ const o=read(); put(o,p,null); write(o); setTimeout(fire,0); return Promise.resolve(); },
+    listen(p,cb){ if(!ls.has(p)) ls.set(p,new Set()); ls.get(p).add(cb); cb(get(read(),p)); return ()=>ls.get(p)&&ls.get(p).delete(cb); }
+  };
+}
+
+/* ===================== অবস্থা ===================== */
+let db, map, meMarker, meCircle;
+const me = { lat:null, lon:null, place:'' };
+let status = 'off';     // চালক: wait / run / off   যাত্রী: req / off
+let dest = '';
+let want = 'any';
+const sent = {};        // কাকে নক করেছি
+let inbox = {}, seenKnock = {};
+let curCell = null, unsubs = [], cellData = {}, pubCell = null, lastPub = 0;
+const markers = new Map();
+let lastSig = '';
+
+/* ===================== সেটআপ ===================== */
+function fillVehicles(sel, withAny){
+  sel.innerHTML = '';
+  if(withAny){ const o=document.createElement('option'); o.value='any'; o.textContent='যেকোনো গাড়ি'; sel.appendChild(o); }
+  Object.entries(VEHICLES).forEach(([k,v])=>{ const o=document.createElement('option'); o.value=k; o.textContent=v[0]+' '+v[1]; sel.appendChild(o); });
+}
+fillVehicles($('sVeh'));
+document.querySelectorAll('input[name=role]').forEach(r=>r.addEventListener('change',()=>{ $('vWrap').classList.toggle('hide', r.value!=='driver' || !r.checked); }));
+
+function openSetup(){
+  $('setup').classList.remove('hide');
+  $('sName').value = S.name||''; $('sPhone').value = S.phone||'';
+  if(S.vehicle) $('sVeh').value = S.vehicle;
+  document.querySelectorAll('input[name=role]').forEach(r=>{ r.checked = r.value===S.role; });
+  $('vWrap').classList.toggle('hide', S.role!=='driver');
+}
+$('profBtn').onclick = openSetup;
+$('sSave').onclick = () => {
+  const role = (document.querySelector('input[name=role]:checked')||{}).value;
+  const name = $('sName').value.trim(), phone = $('sPhone').value.trim().replace(/\s|-/g,'');
+  if(!role) return toast('যাত্রী নাকি চালক — বেছে নিন');
+  if(!name) return toast('নাম লিখুন');
+  if(!/^(\+?88)?01\d{9}$/.test(phone)) return toast('সঠিক মোবাইল নম্বর দিন (01XXXXXXXXX)');
+  const changed = S.role && S.role !== role;
+  S.role=role; S.name=name; S.phone=phone; S.vehicle = role==='driver' ? $('sVeh').value : (S.vehicle||'cng');
+  saveS();
+  if(changed || !window.__booted){ location.reload(); } else { location.reload(); }
+};
+
+/* ===================== প্যানেল ===================== */
+function renderPanel(){
+  const p = $('panel'); p.innerHTML = '';
+  const where = h('div','where'); where.id='where'; where.textContent = '📍 আপনি আছেন: ' + (me.place || (me.lat ? 'জায়গা খোঁজা হচ্ছে…' : 'লোকেশন খোঁজা হচ্ছে…'));
+  p.appendChild(where);
+
+  if(S.role==='driver'){
+    const seg = h('div','seg'); seg.style.marginTop='10px';
+    [['wait','w','🟢 অপেক্ষায়'],['run','r','🟠 চলমান'],['off','x','⚫ অফলাইন']].forEach(([k,c,t])=>{
+      const b = h('button', status===k ? 'on '+c : '', t); b.onclick=()=>setDriverStatus(k); seg.appendChild(b);
+    });
+    p.appendChild(seg);
+    if(status==='run'){
+      const l = h('label','f','কোথায় যাচ্ছেন? (ঐচ্ছিক)'); p.appendChild(l);
+      const i = document.createElement('input'); i.placeholder='যেমন: লঞ্চঘাট'; i.value=dest; i.maxLength=40;
+      i.oninput=()=>{ dest=i.value; clearTimeout(i.t); i.t=setTimeout(publish,600); }; p.appendChild(i);
+    }
+    const m = h('div','mu', status==='off' ? 'অফলাইন — যাত্রীরা আপনাকে দেখতে পাচ্ছে না। অপেক্ষায় বা চলমান দিলে ম্যাপে আপনার গাড়ির আইকন দেখাবে।' : 'আপনার গাড়ির আইকন যাত্রীদের ম্যাপে দেখা যাচ্ছে। অ্যাপ খোলা ও স্ক্রিন অন রাখুন।');
+    m.style.marginTop='8px'; p.appendChild(m);
+  } else {
+    if(status==='req'){
+      const t = h('div',null,'✅ আপনার অনুরোধ চালকদের দেখানো হচ্ছে'); t.style.cssText='margin-top:8px;font-weight:700;color:#15803d'; p.appendChild(t);
+      p.appendChild(h('div','mu','📍 '+(me.place||'')+'  ➡️ '+dest+(want!=='any'?'  · '+VEH(want)[1]:'')));
+      const b = h('button','btn gr','✋ অনুরোধ বাতিল'); b.onclick=()=>{ status='off'; unpublish(); renderPanel(); scheduleRender(); }; p.appendChild(b);
+    } else {
+      p.appendChild(h('label','f','কোথায় যাবেন?'));
+      const i = document.createElement('input'); i.id='dest'; i.placeholder='যেমন: বাস স্ট্যান্ড'; i.value=dest; i.maxLength=40; i.oninput=()=>{dest=i.value;}; p.appendChild(i);
+      p.appendChild(h('label','f','কী গাড়ি চান?'));
+      const s = document.createElement('select'); fillVehicles(s,true); s.value=want; s.onchange=()=>{want=s.value;}; p.appendChild(s);
+      const b = h('button','btn o','🙋 আমি গাড়ি চাই'); b.onclick=requestRide; p.appendChild(b);
+      p.appendChild(h('div','mu','নিচের ম্যাপে কাছের গাড়িগুলো দেখুন। চাইলে সরাসরি খালি গাড়িকে নক করতে পারেন, অথবা অনুরোধ দিন যাতে চালকরা আপনাকে নক করে।')).style.marginTop='8px';
+    }
+  }
+}
+function setDriverStatus(k){
+  status=k;
+  if(k!=='run') dest = k==='wait' ? '' : dest;
+  if(k==='off') unpublish(); else { publish(true); keepAwake(); demoDriverKnock(); }
+  renderPanel(); scheduleRender();
+}
+function requestRide(){
+  if(!me.lat) return toast('আগে লোকেশন চালু করুন');
+  dest = ($('dest').value||'').trim();
+  if(!dest) return toast('কোথায় যাবেন লিখুন');
+  status='req'; publish(true); renderPanel(); scheduleRender();
+}
+
+/* ===================== প্রকাশ (নিজের অবস্থান পাঠানো) ===================== */
+const myPath = c => S.role+'s/'+c+'/'+S.id;
+function unpublish(){ if(pubCell){ db.remove(myPath(pubCell)); pubCell=null; } }
+function publish(force){
+  if(me.lat==null) return;
+  if(!((S.role==='driver' && status!=='off') || (S.role==='passenger' && status==='req'))) return;
+  const c = cellOf(me.lat,me.lon);
+  if(pubCell && pubCell!==c) db.remove(myPath(pubCell));
+  pubCell=c; lastPub=Date.now();
+  const rec = { n:S.name, lat:+me.lat.toFixed(5), lon:+me.lon.toFixed(5), pl:me.place||'', d:dest||'', t:Date.now() };
+  if(S.role==='driver'){ rec.v=S.vehicle; rec.s=status; } else { rec.v=want; rec.s='req'; }
+  db.set(myPath(c), rec, true);
+}
+setInterval(()=>publish(), 20000);
+
+/* ===================== লোকেশন ===================== */
+let geoBusy=false, geoLast=null, geoFail=0;
+async function resolvePlace(){
+  if(geoBusy || me.lat==null) return;
+  if(geoLast && dist(geoLast.lat,geoLast.lon,me.lat,me.lon)<0.15) return;
+  if(Date.now()-geoFail<30000) return;
+  geoBusy=true; const lat=me.lat, lon=me.lon;
+  try{
+    const r = await fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=17&accept-language=bn&lat='+lat+'&lon='+lon);
+    const j = await r.json(); const a = j.address||{};
+    const parts = [a.road||a.pedestrian, a.neighbourhood||a.suburb||a.hamlet||a.village, a.city||a.town||a.municipality||a.county].filter(Boolean);
+    const uniq = [...new Set(parts)].slice(0,2);
+    me.place = uniq.join(', ') || (j.display_name||'').split(',').slice(0,2).join(',') || 'অজানা স্থান';
+    geoLast={lat,lon}; renderPanel(); publish(true);
+  }catch(e){ geoFail=Date.now(); if(!me.place) me.place='অজানা স্থান'; renderPanel(); }
+  geoBusy=false;
+}
+function onPos(p){
+  const first = me.lat==null;
+  me.lat=p.coords.latitude; me.lon=p.coords.longitude;
+  if(!meMarker){ meMarker=L.circleMarker([me.lat,me.lon],{radius:9,color:'#fff',weight:3,fillColor:'#2563eb',fillOpacity:1}).addTo(map).bindTooltip('আপনি',{permanent:false}); }
+  else meMarker.setLatLng([me.lat,me.lon]);
+  if(first){ map.setView([me.lat,me.lon],15); renderPanel(); if(db.demo) seedDemo(); }
+  subscribe(me.lat,me.lon);
+  resolvePlace();
+  if(Date.now()-lastPub>6000) publish();
+  scheduleRender();
+}
+function startGeo(){
+  if(!navigator.geolocation){ toast('আপনার ফোনে লোকেশন সুবিধা নেই'); return; }
+  navigator.geolocation.watchPosition(onPos, e=>{ toast('লোকেশনের অনুমতি দিন (ব্রাউজার সেটিংস)'); $('where') && ($('where').textContent='📍 লোকেশন পাওয়া যায়নি — অনুমতি দিন'); }, {enableHighAccuracy:true,maximumAge:5000,timeout:25000});
+}
+let wl=null;
+async function keepAwake(){ try{ if('wakeLock' in navigator && !wl){ wl=await navigator.wakeLock.request('screen'); wl.addEventListener('release',()=>wl=null); } }catch(e){} }
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden && status!=='off') keepAwake(); });
+
+/* ===================== আশপাশের ডেটা শোনা ===================== */
+function subscribe(lat,lon){
+  const c = cellOf(lat,lon); if(c===curCell) return; curCell=c;
+  unsubs.forEach(u=>u()); unsubs=[]; cellData={};
+  const [cy,cx] = c.split('_').map(Number);
+  const target = S.role==='driver' ? 'passengers' : 'drivers';
+  for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+    const k=(cy+dy)+'_'+(cx+dx);
+    unsubs.push(db.listen(target+'/'+k, v=>{ cellData[k]=v||{}; scheduleRender(); }));
+  }
+}
+function getItems(){
+  const out=[], now=Date.now(), rad=+$('radius').value;
+  Object.values(cellData).forEach(cell=>{
+    Object.entries(cell).forEach(([id,r])=>{
+      if(!r || id===S.id) return;
+      const lat=Number(r.lat), lon=Number(r.lon), t=Number(r.t);
+      if(!isFinite(lat)||!isFinite(lon)||now-t>TTL) return;
+      const km = me.lat==null ? 0 : dist(me.lat,me.lon,lat,lon);
+      if(me.lat!=null && km>rad) return;
+      out.push({id,n:String(r.n||''),lat,lon,pl:String(r.pl||''),d:String(r.d||''),v:String(r.v||''),s:String(r.s||''),t,km});
+    });
+  });
+  return out.sort((a,b)=>a.km-b.km);
+}
+
+/* ===================== কার্ড ও ম্যাপ ===================== */
+function cardEl(it){
+  const isD = S.role==='passenger';
+  const cls = isD ? (it.s==='run'?'run':'wait') : 'pass';
+  const c = h('div','card '+cls);
+  c.appendChild(h('div','ic', isD ? VEH(it.v)[0] : '🧍'));
+  const inf = h('div','inf');
+  inf.appendChild(h('div','pl', '📍 '+(it.pl||'অজানা স্থান')));
+  if(isD){
+    if(it.s==='run') inf.appendChild(h('div','ds', it.d ? '➡️ যাচ্ছেন: '+it.d : '🟠 চলমান'));
+    else inf.appendChild(h('div','ds','🟢 খালি — অপেক্ষায়'));
+    inf.appendChild(h('div','mt', VEH(it.v)[1]+(it.n?' · '+it.n:'')+' · '+fmtKm(it.km)+' দূরে · '+ago(it.t)));
+  } else {
+    inf.appendChild(h('div','ds','➡️ যাবে: '+(it.d||'—')));
+    inf.appendChild(h('div','mt', (it.n||'যাত্রী')+' · '+fmtKm(it.km)+' দূরে · '+ago(it.t)+(it.v&&it.v!=='any'?' · চান: '+VEH(it.v)[1]:'')));
+  }
+  const b = h('button','');
+  const was = sent[it.id] && Date.now()-sent[it.id]<120000;
+  if(isD && it.s==='run'){ b.textContent='ব্যস্ত'; b.disabled=true; }
+  else if(was){ b.textContent='✓ নক হয়েছে'; b.className='done'; b.disabled=true; }
+  else { b.textContent='👋 নক'; b.onclick=()=>knock(it); }
+  c.appendChild(b);
+  return c;
+}
+function markerHtml(it){
+  const isD = S.role==='passenger';
+  const cls = isD ? (it.s==='run'?'run':'wait') : 'pass';
+  const ic = isD ? VEH(it.v)[0] : '🧍';
+  const lab = '<b>'+esc(it.pl||'অজানা স্থান')+'</b>'
+    + (isD ? (it.s==='run' ? (it.d?'<span>→ '+esc(it.d)+'</span>':'') : '') : '<span>→ '+esc(it.d||'—')+'</span>')
+    + (isD ? '<i>'+(it.s==='run'?'চলমান':'খালি')+'</i>' : '');
+  return '<div class="mk '+cls+'"><div class="mi">'+ic+'</div><div class="ml">'+lab+'</div></div>';
+}
+let rt; function scheduleRender(){ clearTimeout(rt); rt=setTimeout(render,150); }
+function render(){
+  const items = getItems();
+  const isD = S.role==='passenger';
+  $('listTitle').textContent = (isD ? '🚖 কাছের গাড়ি' : '🧍 কাছের যাত্রী') + ' ('+bn(items.length)+')';
+  const sig = items.map(i=>[i.id,i.s,i.pl,i.d,i.v,Math.round(i.km*10),!!(sent[i.id]&&Date.now()-sent[i.id]<120000)].join('|')).join('~');
+  if(sig!==lastSig){
+    lastSig=sig;
+    const box=$('list');
+    if(!items.length) box.replaceChildren(h('div','empty', isD ? 'কাছে এখন কোনো গাড়ি অনলাইনে নেই' : (S.role==='driver'&&status==='off' ? 'অপেক্ষায় বা চলমান দিন, তারপর কাছের যাত্রী দেখুন' : 'কাছে এখন কোনো যাত্রী নেই')));
+    else box.replaceChildren(...items.map(cardEl));
+  }
+  // মার্কার
+  const keep=new Set();
+  items.forEach(it=>{
+    keep.add(it.id);
+    const html=markerHtml(it); let m=markers.get(it.id);
+    if(!m){
+      m=L.marker([it.lat,it.lon],{icon:L.divIcon({html,className:'mkw',iconSize:[0,0]})}).addTo(map);
+      m._html=html; markers.set(it.id,m);
+      m.on('click',()=>{ const w=h('div','pop'); w.appendChild(cardEl(m._it)); m.unbindPopup().bindPopup(w).openPopup(); });
+    } else {
+      m.setLatLng([it.lat,it.lon]);
+      if(m._html!==html){ m.setIcon(L.divIcon({html,className:'mkw',iconSize:[0,0]})); m._html=html; }
+    }
+    m._it=it;
+  });
+  markers.forEach((m,id)=>{ if(!keep.has(id)){ map.removeLayer(m); markers.delete(id); } });
+}
+setInterval(()=>{ lastSig=''; scheduleRender(); }, 30000);
+
+/* ===================== নক ===================== */
+function knock(it, type){
+  const rec = { fn:S.name, ph:S.phone, fr:S.role, v:S.role==='driver'?S.vehicle:want, pl:me.place||'', d:dest||'', ty:type||'knock', t:Date.now() };
+  db.set('knocks/'+it.id+'/'+S.id, rec);
+  sent[it.id]=Date.now(); lastSig=''; scheduleRender();
+  toast('নক পাঠানো হয়েছে ✓');
+  if(db.demo && String(it.id).startsWith('demo_') && (type||'knock')==='knock'){
+    setTimeout(()=>db.set('knocks/'+S.id+'/'+it.id,{fn:it.n,ph:'01700000000',fr:S.role==='driver'?'passenger':'driver',v:it.v,pl:it.pl,d:it.d,ty:'accept',t:Date.now()}),3000);
+  }
+}
+function listenKnocks(){
+  db.listen('knocks/'+S.id, v=>{
+    inbox=v||{};
+    Object.entries(inbox).forEach(([k,r])=>{ const sk=k+'|'+r.t; if(!seenKnock[sk]){ seenKnock[sk]=1; if(Date.now()-r.t<60000){ try{navigator.vibrate&&navigator.vibrate([200,100,200]);}catch(e){} toast((r.ty==='accept'?'✅ ':'🔔 ')+(r.fn||'কেউ')+(r.ty==='accept'?' রাজি হয়েছেন':' আপনাকে নক করেছেন')); } } });
+    renderInbox();
+  });
+}
+function renderInbox(){
+  const box=$('inbox'); box.replaceChildren();
+  Object.entries(inbox).filter(([k,r])=>r && Date.now()-r.t<KNOCK_TTL).sort((a,b)=>b[1].t-a[1].t).forEach(([k,r])=>{
+    const ac = r.ty==='accept';
+    const d = h('div','in'+(ac?' ac':''));
+    const who = r.fr==='driver' ? ((VEH(r.v)[0])+' চালক ') : '🧍 যাত্রী ';
+    d.appendChild(h('h3',null,(ac?'✅ ':'🔔 ')+who+(r.fn||'')+(ac?' রাজি হয়েছেন':' আপনাকে নক করেছেন')));
+    d.appendChild(h('div','mu','📍 '+(r.pl||'—')+(r.d?'  ➡️ '+r.d:'')+'  · '+ago(r.t)));
+    const row=h('div','row');
+    const ph=String(r.ph||'').replace(/[^\d+]/g,'');
+    if(ph){ const a=h('a','call','📞 '+bn(ph)); a.className='call'; a.href='tel:'+ph; row.appendChild(a); }
+    if(!ac){ const b=h('button',null,'✅ রাজি (আমার নম্বর পাঠান)'); b.onclick=()=>{ knock({id:k,n:r.fn,v:r.v,pl:r.pl,d:r.d},'accept'); b.disabled=true; b.textContent='পাঠানো হয়েছে'; }; row.appendChild(b); }
+    const x=h('button',null,'✖ সরান'); x.onclick=()=>db.remove('knocks/'+S.id+'/'+k); row.appendChild(x);
+    d.appendChild(row); box.appendChild(d);
+  });
+}
+
+/* ===================== ডেমো ডেটা ===================== */
+const DEMO_PL=['বাজার রোড','লঞ্চঘাট','হাসপাতাল মোড়','বাস স্ট্যান্ড','স্কুল রোড','থানা মোড়','কলেজ গেট','নতুন বাজার'];
+let demoP=[], demoKnocked=false;
+function seedDemo(){
+  const r=()=>(Math.random()-.5)*0.03;
+  const dv=['cng','rickshaw','easybike','car','micro'], dn=['রহিম','করিম','সালাম','জাহিদ','বাবুল'];
+  const D=dv.map((v,i)=>({id:'demo_d'+i,n:dn[i],v,s:i%2?'run':'wait',lat:me.lat+r(),lon:me.lon+r(),pl:DEMO_PL[i],d:i%2?DEMO_PL[(i+3)%8]:''}));
+  const pn=['সুমন','রিনা','কামাল','নাসরিন'];
+  demoP=pn.map((n,i)=>({id:'demo_p'+i,n,v:i%2?'any':'cng',lat:me.lat+r(),lon:me.lon+r(),pl:DEMO_PL[(i+4)%8],d:DEMO_PL[(i+1)%8]}));
+  const tick=()=>{
+    D.forEach(x=>{ if(x.s==='run'){ x.lat+=(Math.random()-.5)*0.0015; x.lon+=(Math.random()-.5)*0.0015; }
+      db.set('drivers/'+cellOf(x.lat,x.lon)+'/'+x.id,{...x,t:Date.now()}); });
+    demoP.forEach(x=>db.set('passengers/'+cellOf(x.lat,x.lon)+'/'+x.id,{...x,s:'req',t:Date.now()}));
+  };
+  tick(); setInterval(tick,15000);
+}
+function demoDriverKnock(){
+  if(!db.demo || S.role!=='driver' || status!=='wait' || demoKnocked || !demoP.length) return;
+  demoKnocked=true; const p=demoP[0];
+  setTimeout(()=>db.set('knocks/'+S.id+'/'+p.id,{fn:p.n,ph:'01800000000',fr:'passenger',v:p.v,pl:p.pl,d:p.d,ty:'knock',t:Date.now()}),8000);
+}
+
+/* ===================== শুরু ===================== */
+async function boot(){
+  if(!S.role || !S.name){ openSetup(); return; }
+  window.__booted=true;
+  $('main').classList.remove('hide');
+  $('roleBadge').textContent = S.role==='driver' ? (VEH(S.vehicle)[0]+' চালক') : '🧍 যাত্রী';
+  if(FIREBASE_CONFIG){
+    try{
+      await loadScript('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
+      await loadScript('https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js');
+      db = makeFirebaseDB(FIREBASE_CONFIG);
+    }catch(e){ toast('সার্ভারে যুক্ত হওয়া যায়নি, ডেমো মোডে চলছে'); db = makeDemoDB(); }
+  } else db = makeDemoDB();
+  if(db.demo) $('demoBar').classList.remove('hide');
+
+  map = L.map('map',{zoomControl:false}).setView([23.7,90.4],7);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+  L.control.zoom({position:'topright'}).addTo(map);
+  $('loc').onclick=()=>{ if(me.lat!=null) map.setView([me.lat,me.lon],16); else toast('লোকেশন এখনো পাওয়া যায়নি'); };
+  $('radius').onchange=()=>{ lastSig=''; scheduleRender(); };
+  $('lbl').onchange=()=>$('map').classList.toggle('nolabel',!$('lbl').checked);
+
+  renderPanel(); listenKnocks(); startGeo(); render();
+}
+boot();
+</script>
+</body>
+</html>
