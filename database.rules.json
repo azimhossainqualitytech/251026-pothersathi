@@ -1,0 +1,154 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "drivers": {
+      ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
+      "$cell": {
+        ".read": "auth != null",
+        ".indexOn": ["t"],
+        "$uid": {
+          ".write": "auth != null && auth.uid === $uid && !root.child('banned').child(auth.uid).exists()",
+          ".validate": "newData.hasChildren(['n','lat','lon','t','s','v'])",
+          "n":   { ".validate": "newData.isString() && newData.val().length <= 30" },
+          "lat": { ".validate": "newData.isNumber() && newData.val() > 20 && newData.val() < 27" },
+          "lon": { ".validate": "newData.isNumber() && newData.val() > 87 && newData.val() < 94" },
+          "t":   { ".validate": "newData.isNumber() && newData.val() <= now + 600000" },
+          "s":   { ".validate": "newData.isString() && newData.val().length <= 5" },
+          "v":   { ".validate": "newData.isString() && newData.val().length <= 12" },
+          "pl":  { ".validate": "newData.isString() && newData.val().length <= 60" },
+          "d":   { ".validate": "newData.isString() && newData.val().length <= 60" },
+          "$other": { ".validate": false }
+        }
+      }
+    },
+
+    "passengers": {
+      ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
+      "$cell": {
+        ".read": "auth != null",
+        ".indexOn": ["t"],
+        "$uid": {
+          ".write": "auth != null && auth.uid === $uid && !root.child('banned').child(auth.uid).exists()",
+          ".validate": "newData.hasChildren(['n','lat','lon','t','s','v'])",
+          "n":   { ".validate": "newData.isString() && newData.val().length <= 30" },
+          "lat": { ".validate": "newData.isNumber() && newData.val() > 20 && newData.val() < 27" },
+          "lon": { ".validate": "newData.isNumber() && newData.val() > 87 && newData.val() < 94" },
+          "t":   { ".validate": "newData.isNumber() && newData.val() <= now + 600000" },
+          "s":   { ".validate": "newData.isString() && newData.val().length <= 5" },
+          "v":   { ".validate": "newData.isString() && newData.val().length <= 12" },
+          "pl":  { ".validate": "newData.isString() && newData.val().length <= 60" },
+          "d":   { ".validate": "newData.isString() && newData.val().length <= 60" },
+          "$other": { ".validate": false }
+        }
+      }
+    },
+
+    "knocks": {
+      "$to": {
+        ".read": "auth != null && auth.uid === $to",
+        ".indexOn": ["t"],
+        "$from": {
+          ".write": "auth != null && auth.uid === $from && !root.child('banned').child(auth.uid).exists() && !root.child('blockedBy').child($from).child($to).exists() && (!data.exists() || data.child('t').val() < now - 600000)",
+          ".validate": "newData.hasChildren(['fn','ph','fr','ty','t']) && newData.child('t').val() <= now + 600000 && newData.child('t').val() > now - 600000",
+          "fn":  { ".validate": "newData.isString() && newData.val().length <= 30" },
+          "ph":  { ".validate": "newData.isString() && newData.val().length <= 16" },
+          "fr":  { ".validate": "newData.isString() && newData.val().length <= 10" },
+          "v":   { ".validate": "newData.isString() && newData.val().length <= 12" },
+          "pl":  { ".validate": "newData.isString() && newData.val().length <= 60" },
+          "d":   { ".validate": "newData.isString() && newData.val().length <= 60" },
+          "ty":  { ".validate": "newData.isString() && newData.val().length <= 8" },
+          "t":   { ".validate": "newData.isNumber()" },
+          "lat": { ".validate": "newData.isNumber()" },
+          "lon": { ".validate": "newData.isNumber()" },
+          "$other": { ".validate": false }
+        }
+      }
+    },
+
+    "blocks": {
+      "$me": {
+        ".read": "auth != null && auth.uid === $me",
+        ".write": "auth != null && auth.uid === $me",
+        "$x": { ".validate": "newData.val() === true" }
+      }
+    },
+    "blockedBy": {
+      "$target": {
+        ".read": "auth != null && auth.uid === $target",
+        "$blocker": {
+          ".write": "auth != null && auth.uid === $blocker",
+          ".validate": "newData.val() === true"
+        }
+      }
+    },
+
+    "reports": {
+      ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
+      "$target": {
+        "$reporter": {
+          ".write": "auth != null && auth.uid === $reporter",
+          ".validate": "newData.hasChildren(['r','t'])",
+          "r":  { ".validate": "newData.isString() && newData.val().length <= 100" },
+          "t":  { ".validate": "newData.isNumber()" },
+          "tn": { ".validate": "newData.isString() && newData.val().length <= 30" },
+          "tp": { ".validate": "newData.isString() && newData.val().length <= 16" },
+          "$other": { ".validate": false }
+        }
+      }
+    },
+
+    "banned": {
+      ".read": "auth != null",
+      ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
+    },
+
+    "admins": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid"
+      }
+    },
+
+    "places": {
+      "$k": {
+        ".read": "auth != null",
+        ".write": "auth != null && !root.child('banned').child(auth.uid).exists() && (!data.exists() || data.child('s').val() === 'osm' || root.child('admins').child(auth.uid).exists())",
+        ".validate": "newData.hasChildren(['n','s'])",
+        "n": { ".validate": "newData.isString() && newData.val().length <= 50" },
+        "s": { ".validate": "newData.isString() && (newData.val() === 'osm' || newData.val() === 'user')" },
+        "$other": { ".validate": false }
+      }
+    },
+
+    "users": {
+      ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
+      "$uid": {
+        ".write": "auth != null && auth.uid === $uid",
+        ".validate": "newData.hasChildren(['r','c'])",
+        "r": { ".validate": "newData.isString() && newData.val().length <= 1" },
+        "c": { ".validate": "newData.isNumber()" },
+        "d": { ".validate": "newData.isString() && newData.val().length <= 20" },
+        "v": { ".validate": "newData.isString() && newData.val().length <= 12" },
+        "$other": { ".validate": false }
+      }
+    },
+
+    "daily": {
+      ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
+      "$date": {
+        ".validate": "$date.length === 10",
+        "$uid": {
+          ".write": "auth != null && auth.uid === $uid",
+          ".validate": "newData.hasChildren(['r','t'])",
+          "r": { ".validate": "newData.isString() && newData.val().length <= 1" },
+          "k": { ".validate": "newData.isNumber()" },
+          "a": { ".validate": "newData.isNumber()" },
+          "d": { ".validate": "newData.isString() && newData.val().length <= 20" },
+          "t": { ".validate": "newData.isNumber()" },
+          "$other": { ".validate": false }
+        }
+      }
+    }
+  }
+}
